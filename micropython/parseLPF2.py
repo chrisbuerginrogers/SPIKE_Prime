@@ -22,7 +22,7 @@ def CMD(package):
     good = cksm(package)
 
     if CCC < 8:
-        formating = ['b','bbbb','i','b','b','READ','b','>ll']
+        formating = ['b','bb','i','b','b','READ','b','>ll']
         payload = struct.unpack(formating[CCC],package[1:-1])
     else:
         payload = 'ERR'

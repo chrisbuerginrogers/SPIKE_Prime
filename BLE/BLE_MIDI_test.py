@@ -4,7 +4,7 @@ from BLE_MIDI import *
 notes = [60,61,62,63,64,63,62,61]
 
 def Music():
-    midi = MIDI_Player('chris')
+    midi = MIDI_Player('fred')
     midi.wait_for_connection()
     Piano = MIDI_Instrument(midi, instruments['Acoustic Grand Piano'],channel = 0)
     Trumpet = MIDI_Instrument(midi, instruments['Trumpet'],channel = 1)
