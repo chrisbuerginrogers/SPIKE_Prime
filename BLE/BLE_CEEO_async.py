@@ -1,5 +1,5 @@
 import bluetooth
-import time
+import asyncio, time
 import struct
 import micropython
 micropython.alloc_emergency_exception_buf(128)
@@ -71,7 +71,7 @@ class Useful:
             done = self.is_connected
             if not done and timeout >= 0:
                 done = (time.ticks_ms()-start) >= timeout
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
             if self.verbose:
                 print('.',end='')
         return self.is_connected
@@ -253,11 +253,11 @@ class Listen(Useful):   # central
         duration = 0 if duration < 0 else duration
         return self._ble.gap_scan(duration, 30000, 30000)
 
-    def wait_for_scan(self):
+    async def wait_for_scan(self):
         while self.scanning:
             if self.verbose:
                 print('.',end='')
-            time.sleep(0.1)
+            await asyncio.sleep(0.1)
 
     def stop_scan(self):
         self._addr_type = None
@@ -284,9 +284,9 @@ class Listen(Useful):   # central
     def connected(self):
         self.is_connected = True
 
-    def connect_up(self, timeout = -1):
+    async def connect_up(self, timeout = -1):
         self.scan(timeout)
-        self.wait_for_scan()
+        await self.wait_for_scan()
         if self.found:
             self.connect()
             return self.wait_for_connection(timeout)
@@ -354,9 +354,9 @@ class Yell(Useful):
             self._ble.gap_disconnect(conn_handle)
         self.printIt("Disconnected from central")
         
-    def connect_up(self, timeout = -1):
+    async def connect_up(self, timeout = -1):
         self.advertise()
-        success = self.wait_for_connection(timeout)
+        success = await self.wait_for_connection(timeout)
         if success:
             self.printIt("\nConnected to central")
         self.stop_advertising()
@@ -368,43 +368,55 @@ class Yell(Useful):
         for conn_handle in self._connections:
             self._ble.gatts_notify(conn_handle, self._handle_tx, data)
         self.printIt("sent to %d central(s): %s" % (len(self._connections), data))
-'''
-def main(mode = 'P'): 
-    if mode == 'P':
-        try:
-            p = Yell('Fred', verbose = False)
-            if p.connect_up():
-                print('P connected')
-                time.sleep(2)
-                payload = ''
-                for i in range(100):
-                    payload += str(i)
-                    p.send(payload)#str(i) + chr(i))
-                    if p.is_any:
-                        print(p.read())
-                    if not p.is_connected:
-                        print('lost connection')
-                        break
-                    time.sleep(1)
-        except Exception as e:
-            print(e)
-        finally:
-            p.disconnect()
-            print('closing up')
-    else:    
-        try:   
-            L = Listen('Fred', verbose = False)
-            if L.connect_up():
-                print('L connected')
-                while L.is_connected:
-                    time.sleep(4)
-                    if L.is_any:
-                        reply = L.read()
-                        print(len(reply))
-                        L.send(reply[:20])
-        except Exception as e:
-            print(e)
-        finally:
-            L.disconnect()
-            print('closing up')
-'''
+
+
+# ----------------------------------------example
+#from BLE_CEEO import Yell, Listen
+import asyncio
+
+async def peripheral(name): 
+    try:
+        p = Yell(name, verbose = True)
+        if p.connect_up():
+            print('peripheral connected')
+            await asyncio.sleep(2)
+            payload = ''
+            for i in range(100):
+                payload += str(i)
+                p.send(payload)#str(i) + chr(i))
+                if p.is_any:
+                    print(p.read())
+                if not p.is_connected:
+                    print('lost connection')
+                    break
+                await asyncio.sleep(1)
+    except Exception as e:
+        print(e)
+    finally:
+        p.disconnect()
+        print('closing up peripheral')
+
+async def central(name):   
+    try:   
+        L = Listen(name, verbose = True)
+        if L.connect_up():
+            print('central connected')
+            while L.is_connected:
+                await asyncio.sleep(4)
+                if L.is_any:
+                    reply = L.read()
+                    print(reply) #seems to stop at 80 characteres
+                L.send(reply[:20])  #seems to stop around 20 characters
+    except Exception as e:
+        print(e)
+    finally:
+        L.disconnect()
+        print('closing up central')
+    
+async def main():  
+    asyncio.create_task(peripheral('Maria')) 
+    asyncio.create_task(central('Maria')) 
+    await asyncio.sleep(100) # wait for 100 sec and then stop everything
+    
+asyncio.run(main())
+        

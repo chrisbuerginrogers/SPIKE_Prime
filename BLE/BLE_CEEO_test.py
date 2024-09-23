@@ -42,4 +42,4 @@ def central(name):
         print('closing up')
 
 #peripheral('Maria')
-central('Maria2')
+#central('Maria')
