@@ -69,7 +69,7 @@ motor.run_to_relative_position(port.E,
 '''
 STOP modes:
 motor.COAST to make the motor coast until a stop
-motor.BREAK to brake and continue to brake after stop
+motor.BRAKE to brake and continue to brake after stop
 motor.HOLD to tell the motor to hold it's position
 motor.CONTINUE to tell the motor to keep running at whatever velocity it's running at until it gets another command
 motor.SMART_COAST to make the motor brake until stop and then coast and compensate for inaccuracies in the next command
@@ -111,7 +111,8 @@ motor_pair.move_for_degrees(motor_pair.PAIR_1,
                             500,             # relative
                             0,               # steering (-100 to 100)
                             velocity=280, 
-                            deceleration=10)
+                            deceleration=10,
+                            )
                             
 motor_pair.move_for_time(motor_pair.PAIR_1, 
                         1000,                  # time in millisec
