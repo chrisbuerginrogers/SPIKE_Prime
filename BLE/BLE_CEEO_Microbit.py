@@ -48,13 +48,6 @@ UART_TX = (UART_TX_CHAR_UUID, FLAG_READ | FLAG_NOTIFY,)
 UART_RX = (UART_RX_CHAR_UUID, FLAG_WRITE | FLAG_WRITE_NO_RESPONSE,)
 UART_SERVICE = (UART_UUID,(UART_TX, UART_RX),)
 
-MIDI_SERVICE_UUID = bluetooth.UUID("03B80E5A-EDE8-4B33-A751-6CE34EC4C700")
-MIDI_CHAR_UUID = bluetooth.UUID("7772E5DB-3868-4112-A1A9-F2669D106BF3")
-
-MIDI_UUID = MIDI_SERVICE_UUID
-MIDI_TXRX = (MIDI_CHAR_UUID, FLAG_READ | FLAG_NOTIFY | FLAG_WRITE_NO_RESPONSE,)
-MIDI_SERVICE = (MIDI_UUID,(MIDI_TXRX,),)
-
 class Useful:
     def setup(self, name, verbose, callback):
         self._ble = bluetooth.BLE()
@@ -197,11 +190,13 @@ class Listen(Useful):   # central
                         
     def uart_check(self, data):
         addr_type, addr, adv_type, rssi, adv_data = data
-        if adv_type in (ADV_IND, ADV_DIRECT_IND) and UART_SERVICE_UUID in self.decode_services(adv_data):
+        if adv_type in (ADV_IND, ADV_DIRECT_IND):
             # Found a potential device, remember it and stop scanning if the name is right
             self._addr_type = addr_type
             self._addr = bytes(addr)  # Note: addr buffer is owned by caller so need to copy it.
             name = self.decode_name(adv_data)
+            if 'BBC' in name:
+                print(name)
             if bytes(addr) not in self.addresses:
                 self.addresses.add(bytes(addr))
             if self.name == '':
@@ -301,112 +296,26 @@ class Listen(Useful):   # central
         self.printIt("sending " + value)
         return self._ble.gattc_write(self._conn_handle, self._rx_handle, value, 1 if response else 0)
 
-#-------------------Peripheral---------------------------------------------------------------------------------------------------------------                
-class Yell(Useful): 
-    def __init__(self, name = 'Pico', interval_us=10000, verbose = True, type = 'uart'):
-        self.setup(name, verbose, self._irq)
-        self.service = UART_UUID if type == 'uart' else MIDI_UUID
-        services = [self.service]
-        if type == 'uart':
-            ((self._handle_tx, self._handle_rx),) = self._ble.gatts_register_services((UART_SERVICE,))
-        elif type == 'midi':
-            ((self._handle_tx, ),) = self._ble.gatts_register_services((MIDI_SERVICE,))
-            self._handle_rx = self._handle_tx   # same handle for both directions
-        else:
-            print('unsupported type')
-        self._connections = set()
-        self._write_callback = self.rx  
-        self.interval_us = interval_us
-                
-    def advertise(self):
-        short = self.name[:8]
-        payload = struct.pack("BB", len(short) + 1, NAME_FLAG) + short  # byte length, byte type, value
-        value = bytes(self.service)
-        payload += struct.pack("BB", len(value) + 1,ADV_TYPE_UUID128_COMPLETE) + value
 
-        self._ble.gap_advertise(self.interval_us, adv_data=payload)
-        self.printIt('Advertising...')
-        
-    def stop_advertising(self):
-        self._ble.gap_advertise(None)
-        self.printIt("Advertising stopped")
-        
-    def _irq(self, event, data):  # Track connections so we can send notifications.
-        if event == IRQ_CENTRAL_CONNECT:
-            conn_handle, _, _ = data
-            self._connections.add(conn_handle)
-            self.is_connected = True
-            self.printIt("Connected: "+str(conn_handle))
-            
-        elif event == IRQ_CENTRAL_DISCONNECT:
-            conn_handle, _, _ = data
-            self._connections.remove(conn_handle)
-            #self._write_callback = None
-            self.is_connected = False  #assuming only one connection
-            self.printIt("Disconnected: " + str(conn_handle))
-            
-        elif event == IRQ_GATTS_WRITE:
-            conn_handle, value_handle = data
-            value = self._ble.gatts_read(value_handle)
-            if value_handle == self._handle_rx and self._write_callback:
-                self._write_callback(value)
-        
-    def disconnect(self):
-        for conn_handle in self._connections:
-            self._ble.gap_disconnect(conn_handle)
-        self.printIt("Disconnected from central")
-        
-    def connect_up(self, timeout = -1):
-        self.advertise()
-        success = self.wait_for_connection(timeout)
-        if success:
-            self.printIt("\nConnected to central")
-        self.stop_advertising()
-        return success
-    
-    def send(self, data):
-        if not self.is_connected:
-            return
-        for conn_handle in self._connections:
-            self._ble.gatts_notify(conn_handle, self._handle_tx, data)
-        self.printIt("sent to %d central(s): %s" % (len(self._connections), data))
 '''
-def main(mode = 'P'): 
-    if mode == 'P':
-        try:
-            p = Yell('Fred', verbose = False)
-            if p.connect_up():
-                print('P connected')
-                time.sleep(2)
-                payload = ''
-                for i in range(100):
-                    payload += str(i)
-                    p.send(payload)#str(i) + chr(i))
-                    if p.is_any:
-                        print(p.read())
-                    if not p.is_connected:
-                        print('lost connection')
-                        break
-                    time.sleep(1)
-        except Exception as e:
-            print(e)
-        finally:
-            p.disconnect()
-            print('closing up')
-    else:    
-        try:   
-            L = Listen('Fred', verbose = False)
-            if L.connect_up():
-                print('L connected')
-                while L.is_connected:
-                    time.sleep(4)
-                    if L.is_any:
-                        reply = L.read()
-                        print(len(reply))
-                        L.send(reply[:20])
-        except Exception as e:
-            print(e)
-        finally:
-            L.disconnect()
-            print('closing up')
+from BLE_CEEO_Microbit import Listen
+
+def main():
+    try:
+        L = Listen('BBC micro:bit [vitit]', verbose = True)
+        if L.connect_up():
+        print('L connected')
+        while L.is_connected:
+            time.sleep(1)
+            if L.is_any:
+                reply = L.read()
+                print(len(reply))
+                L.send(reply[:20])
+    except Exception as e:
+        print(e)
+    finally:
+        L.disconnect()
+        print('closing up')
+
+main()
 '''
