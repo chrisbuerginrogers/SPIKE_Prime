@@ -1,6 +1,6 @@
 #https://lego.github.io/spike-prime-docs/messages.html#x28-devicenotificationrequest
 import struct
-from hub_code.TechElementConsts import *
+from echElementConsts import *
 
 hubType = 'SPIKEPrime'
 
