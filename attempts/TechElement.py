@@ -1,4 +1,4 @@
-from hub_code.TechElementConsts import *
+from TechElementConsts import *
 
 hubType = 'TechElement'
 
